@@ -904,24 +904,23 @@
             1.  `kubectl apply -f webapp-pvc.yaml -n <namespace>`
             2.  `kubectl apply -f content-pod.yaml -n <namespace>`
 
-### Security (Güvenlik)
-
 *   **RBAC: ServiceAccounts, Roles, RoleBindings**
     *   **Çalışma Mantığı Notu:**
-        *   **Authentication (Kimlik Doğrulama):** "Kimsin?" sorusunun cevabıdır. Kubernetes'te iki tür kullanıcı vardır: Normal Kullanıcılar (insanlar, genellikle dış kimlik sağlayıcıları ile yönetilir) ve ServiceAccount'lar (Pod'lar içinde çalışan süreçler için Kubernetes tarafından yönetilen kimlikler).
-        *   **Authorization (Yetkilendirme):** "Ne yapabilirsin?" sorusunun cevabıdır. Kimliği doğrulanmış bir öznenin (kullanıcı, grup, ServiceAccount) hangi kaynaklar üzerinde hangi işlemleri (verbs: get, list, watch, create, update, patch, delete) yapabileceğini belirler. RBAC (Role-Based Access Control) en yaygın yetkilendirme mekanizmasıdır.
-        *   **ServiceAccount (SA):** Pod'lar içinde çalışan uygulamaların Kubernetes API sunucusuna erişmesi için bir kimlik sağlar. Her namespace'de varsayılan olarak `default` adında bir ServiceAccount bulunur. Pod'lar, `serviceAccountName` alanında belirtilmezse bu `default` SA'yı kullanır.
-        *   **Role (Namespace Kapsamlı):** Bir namespace içindeki API kaynaklarına (örn: pods, configmaps, secrets) erişim kurallarını tanımlar.
-        *   **RoleBinding (Namespace Kapsamlı):** Bir Role'ü, aynı namespace içindeki belirli kullanıcılara, gruplara veya ServiceAccount'lara (subjects) bağlar.
-        *   **ClusterRole (Küme Kapsamlı):** Küme genelindeki kaynaklara (örn: nodes, persistentvolumes, namespaces) veya *tüm* namespace'lerdeki namespace-kapsamlı kaynaklara (örn: tüm namespace'lerdeki Pod'lar) erişim kurallarını tanımlar.
+        *   **Authentication (Kimlik Doğrulama):** "Kimsin?" sorusunun cevabıdır. Kubernetes'te iki tür kullanıcı vardır: Normal Kullanıcılar ve ServiceAccount'lar.
+        *   **Authorization (Yetkilendirme):** "Ne yapabilirsin?" sorusunun cevabıdır. RBAC en yaygın yetkilendirme mekanizmasıdır.
+        *   **ServiceAccount (SA):** Namespace'e bağımlı bir kaynaktır. Pod'lar içinde çalışan uygulamaların Kubernetes API sunucusuna erişmesi için bir kimlik sağlar. Her namespace'de varsayılan olarak `default` adında bir ServiceAccount bulunur. Pod'lar, `spec.serviceAccountName` alanında belirtilmezse bu `default` SA'yı kullanır.
+        *   **Role (Namespace Kapsamlı):** Namespace'e bağımlı bir kaynaktır. Bir namespace içindeki API kaynaklarına erişim kurallarını tanımlar.
+        *   **RoleBinding (Namespace Kapsamlı):** Namespace'e bağımlı bir kaynaktır. Bir Role'ü (veya bir ClusterRole'ü, eğer ClusterRole namespace'deki kaynaklara uygulanıyorsa) aynı namespace içindeki belirli kullanıcılara, gruplara veya ServiceAccount'lara (subjects) bağlar.
+        *   **ClusterRole (Küme Kapsamlı):** Küme genelindeki kaynaklara veya *tüm* namespace'lerdeki namespace-kapsamlı kaynaklara erişim kurallarını tanımlar.
         *   **ClusterRoleBinding (Küme Kapsamlı):** Bir ClusterRole'ü, küme genelinde kullanıcılara, gruplara veya ServiceAccount'lara bağlar.
+        *   **Önemli Not:** Bir ServiceAccount'a bir RoleBinding aracılığıyla verilen izinler, o namespace'deki **sadece o ServiceAccount'ı kullanan Pod'lar** için geçerlidir. Namespace'deki diğer Pod'lar (farklı bir SA kullanan veya `default` SA'yı kullanan) bu izinleri otomatik olarak devralmazlar. Bu, "en az yetki prensibi"ni uygulamak için kritik bir ayrıntıdır.
         *   CKAD sınavı daha çok namespace kapsamlı Role ve RoleBinding'lere odaklanır.
     *   **Use Case 1: Pod'a Özel ServiceAccount Atama ve Yetkilendirme (ConfigMap Okuma)**
-        *   **Senaryo:**
-            1.  `config-reader-sa` adında bir ServiceAccount oluşturun.
-            2.  Bu ServiceAccount'a, bulunduğu namespace içindeki `app-global-config` adlı belirli bir ConfigMap'i okuma (`get`) yetkisi veren bir Role (`specific-configmap-reader-role`) ve bu Role'ü SA'ya bağlayan bir RoleBinding (`specific-configmap-reader-binding`) oluşturun.
-            3.  `config-consuming-app-pod` adlı bir Pod'un bu `config-reader-sa` ServiceAccount'ını kullanmasını sağlayın.
-        *   **Çözüm Yaklaşımı:** SA, Role, RoleBinding ve Pod manifestoları oluşturulur. Role'de `resourceNames` kullanılır.
+        *   **Senaryo:** ...
+        *   **Çözüm Yaklaşımı:** SA, Role, RoleBinding ve Pod manifestoları oluşturulur. Role'de `resourceNames` kullanılır. CKAD sınavında hem imperative komutlar hem de YAML manifestleri kabul edilir.
+            *   **ServiceAccount Oluşturma:** Genellikle `kubectl create serviceaccount <sa-name> -n <namespace>` yeterlidir.
+            *   **Role Oluşturma:** `resourceNames` gibi spesifik kısıtlamalar veya birden fazla kural içeren Role'ler için YAML manifesti kullanmak daha açık ve yönetilebilirdir.
+            *   **RoleBinding Oluşturma:** `kubectl create rolebinding <binding-name> --role=<role-name> --serviceaccount=<namespace>:<sa-name> -n <namespace>` gibi imperative komutlar çoğu senaryo için hızlı ve yeterlidir.
         *   **Efektif Çözüm:**
             1.  `kubectl create serviceaccount config-reader-sa -n <namespace>`
             2.  Role YAML (`specific-configmap-reader-role.yaml`):
@@ -930,29 +929,31 @@
                 kind: Role
                 metadata:
                   name: specific-configmap-reader-role
+                  namespace: <target-namespace> # Role'ün uygulanacağı namespace
                 rules:
                 - apiGroups: [""] # Core API grubu
                   resources: ["configmaps"]
                   resourceNames: ["app-global-config"] # Sadece bu ConfigMap'e erişim
                   verbs: ["get"]
                 ```
-                `kubectl apply -f specific-configmap-reader-role.yaml -n <namespace>`
-            3.  `kubectl create rolebinding specific-configmap-reader-binding --role=specific-configmap-reader-role --serviceaccount=<namespace>:config-reader-sa -n <namespace>`
+                `kubectl apply -f specific-configmap-reader-role.yaml` (Eğer manifest içinde namespace belirtilmediyse `-n <target-namespace>` ile)
+            3.  `kubectl create rolebinding specific-configmap-reader-binding --role=specific-configmap-reader-role --serviceaccount=<target-namespace>:config-reader-sa -n <target-namespace>`
             4.  `config-consuming-app-pod.yaml`:
                 ```yaml
                 apiVersion: v1
                 kind: Pod
                 metadata:
                   name: config-consuming-app-pod
+                  namespace: <target-namespace> # Pod'un ve SA'nın bulunduğu namespace
                 spec:
-                  serviceAccountName: config-reader-sa
+                  serviceAccountName: config-reader-sa # Bu SA'nın kimliğini kullan
                   containers:
                   - name: app-container
                     image: appropriate/kubectl # Veya kubectl içeren başka bir imaj
                     # Bu komut, SA'nın yetkisi varsa ConfigMap'i getirecektir
-                    command: ["kubectl", "get", "configmap", "app-global-config", "-n", "<namespace>", "-o", "yaml"]
+                    command: ["kubectl", "get", "configmap", "app-global-config", "-n", "<target-namespace>", "-o", "yaml"]
                 ```
-                `kubectl apply -f config-consuming-app-pod.yaml -n <namespace>`
+                `kubectl apply -f config-consuming-app-pod.yaml`
     *   **Use Case 2: ServiceAccount'ın Token'ının Otomatik Mount Edilmemesi**
         *   **Senaryo:** `no-api-access-pod` adlı bir Pod oluşturun. Bu Pod'un ServiceAccount token'ının (`/var/run/secrets/kubernetes.io/serviceaccount/token`) otomatik olarak mount edilmemesini sağlayın. Bu, Pod'un Kubernetes API'sine erişmesi gerekmiyorsa güvenlik açısından iyi bir pratiktir.
         *   **Çözüm Yaklaşımı:** Pod manifestosunda `automountServiceAccountToken: false` ayarlanır. Eğer ServiceAccount seviyesinde de `automountServiceAccountToken: false` ayarlanırsa, o SA'yı kullanan tüm Pod'lar için varsayılan bu olur (Pod seviyesinde override edilebilir).
