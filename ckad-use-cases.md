@@ -491,12 +491,37 @@
                 Veya Service YAML'ını düzenleyip `kubectl apply -f webapp-router-svc.yaml -n <namespace>` ile uygulayın.
 *   **Jobs and CronJobs**
     *   **Çalışma Mantığı Notu (Job):**
+        *   Bir veya daha fazla Pod'u çalıştırır ve Pod(lar) başarıyla tamamlanana kadar devam eder. Başarıyla tamamlandığında Job sonlanır.
         *   `restartPolicy` Pod template'i içinde `OnFailure` (başarısız olursa Pod içindeki container'lar yeniden başlatılır, Job yeniden dener) veya `Never` (başarısız olursa Pod hata durumunda kalır, Job yeniden dener) olabilir. `Always` olamaz.
+        *   `completions`: Job'un başarılı sayılması için kaç tane Pod'un başarıyla tamamlanması gerektiğini belirtir (varsayılan 1).
+        *   `parallelism`: Aynı anda kaç tane Pod'un çalışabileceğini belirtir (varsayılan 1).
         *   `backoffLimit`: Bir Job'un başarısız sayılmadan önce kaç kez yeniden deneneceği (Pod seviyesinde başarısızlıklar için, varsayılan 6).
         *   `activeDeadlineSeconds`: Job'un ne kadar süreyle aktif kalabileceğini belirtir. Bu süre aşılırsa, çalışan tüm Pod'ları sonlandırılır ve Job başarısız olarak işaretlenir.
-        *   `ttlSecondsAfterFinished`: Tamamlanmış (başarılı veya başarısız) Job'ların ve onlara ait Pod'ların otomatik olarak silinmeden önce ne kadar süreyle tutulacağını belirtir.
-    *   **Use Case (CronJob - Concurrency Policy):** Her 5 dakikada bir çalışan `data-cleanup-cronjob` adlı bir CronJob oluşturun. Eğer önceki Job çalışması hala devam ediyorsa, yeni bir Job başlatılmasın (`concurrencyPolicy: Forbid`). Başarılı Job'ların geçmişi 3, başarısız Job'ların geçmişi 1 olarak tutulsun.
-    *   **Efektif Çözüm:** `cleanup-cronjob.yaml`:
+        *   `ttlSecondsAfterFinished`: Tamamlanmış (başarılı veya başarısız) Job'ların ve onlara ait Pod'ların otomatik olarak silinmeden önce ne kadar süreyle tutulacağını belirtir. Bu özellik, küme kaynaklarının temizlenmesine yardımcı olur.
+    *   **Use Case 1 (Standalone Job - Batch İşlem):** `data-processor-job` adında bir Job oluşturun. Bu Job, `my-batch-processor:v1.2` imajını kullanarak bir veri işleme görevi çalıştırsın. Job başarısız olursa en fazla 3 kez (`backoffLimit: 3`) yeniden denensin. Job tamamlandıktan (başarılı veya başarısız) 120 saniye sonra (`ttlSecondsAfterFinished: 120`) otomatik olarak silinsin. Job'un en fazla 600 saniye (`activeDeadlineSeconds: 600`) içinde tamamlanması gereksin.
+    *   **Efektif Çözüm (Standalone Job YAML - `batch-job.yaml`):**
+        ```yaml
+        apiVersion: batch/v1
+        kind: Job
+        metadata:
+          name: data-processor-job
+        spec:
+          template:
+            spec:
+              containers:
+              - name: data-processor-container
+                image: my-batch-processor:v1.2 # Gerçek bir imajla değiştirin
+                command: ["/app/process-data.sh"] # Örnek komut
+                # args: ["--input=/data/input", "--output=/data/output"]
+              restartPolicy: OnFailure # Veya Never
+          backoffLimit: 3
+          activeDeadlineSeconds: 600
+          ttlSecondsAfterFinished: 120
+        ```
+        `kubectl apply -f batch-job.yaml -n <namespace>`
+        *   Kontrol: `kubectl get jobs -n <namespace>`, `kubectl describe job data-processor-job -n <namespace>`, `kubectl logs -l job-name=data-processor-job -n <namespace>`
+    *   **Use Case 2 (CronJob - Concurrency Policy):** Her 5 dakikada bir çalışan `data-cleanup-cronjob` adlı bir CronJob oluşturun. Eğer önceki Job çalışması hala devam ediyorsa, yeni bir Job başlatılmasın (`concurrencyPolicy: Forbid`). Başarılı Job'ların geçmişi 3, başarısız Job'ların geçmişi 1 olarak tutulsun.
+    *   **Efektif Çözüm (CronJob YAML - `cleanup-cronjob.yaml`):**
         ```yaml
         apiVersion: batch/v1
         kind: CronJob
@@ -507,17 +532,20 @@
           concurrencyPolicy: Forbid # Allow (varsayılan), Forbid, Replace
           successfulJobsHistoryLimit: 3
           failedJobsHistoryLimit: 1
-          jobTemplate:
+          jobTemplate: # CronJob'un çalıştıracağı Job'un şablonu
             spec:
+              # ttlSecondsAfterFinished: 300 # İsteğe bağlı: Her bir Job tamamlandıktan sonra silinsin
               template:
                 spec:
                   containers:
                   - name: cleanup-container
-                    image: my-cleanup-script-runner
-                    # ... command/args
+                    image: my-cleanup-script-runner # Gerçek bir imajla değiştirin
+                    # command: ["/app/cleanup.sh"]
+                    # args: ["--older-than=7d"]
                   restartPolicy: OnFailure
         ```
         `kubectl apply -f cleanup-cronjob.yaml -n <namespace>`
+        *   Kontrol: `kubectl get cronjobs -n <namespace>`, `kubectl get jobs -n <namespace>` (CronJob tarafından oluşturulan Job'ları görmek için)
 *   **PodDisruptionBudgets (PDBs)**
     *   **Use Case:** `app=payment-gateway` etiketli Pod'lardan en az 2 tanesinin her zaman çalışır durumda olmasını (`minAvailable: 2`) garanti eden bir PDB (`payment-pdb`) oluşturun. Bu, gönüllü kesintiler (node bakımı, küme yükseltmesi gibi) sırasında uygulamanın erişilebilirliğini korur.
     *   **Çözüm Yaklaşımı:** PDB manifestosu oluşturulur.
