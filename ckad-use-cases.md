@@ -916,14 +916,19 @@
         *   **Önemli Not:** Bir ServiceAccount'a bir RoleBinding aracılığıyla verilen izinler, o namespace'deki **sadece o ServiceAccount'ı kullanan Pod'lar** için geçerlidir. Namespace'deki diğer Pod'lar (farklı bir SA kullanan veya `default` SA'yı kullanan) bu izinleri otomatik olarak devralmazlar. Bu, "en az yetki prensibi"ni uygulamak için kritik bir ayrıntıdır.
         *   CKAD sınavı daha çok namespace kapsamlı Role ve RoleBinding'lere odaklanır.
     *   **Use Case 1: Pod'a Özel ServiceAccount Atama ve Yetkilendirme (ConfigMap Okuma)**
-        *   **Senaryo:** ...
-        *   **Çözüm Yaklaşımı:** SA, Role, RoleBinding ve Pod manifestoları oluşturulur. Role'de `resourceNames` kullanılır. CKAD sınavında hem imperative komutlar hem de YAML manifestleri kabul edilir.
+        *   **Senaryo:**
+            1.  `config-reader-sa` adında bir ServiceAccount oluşturun.
+            2.  Bu ServiceAccount'a, bulunduğu namespace içindeki `app-global-config` adlı belirli bir ConfigMap'i okuma (`get`) yetkisi veren bir Role (`specific-configmap-reader-role`) ve bu Role'ü SA'ya bağlayan bir RoleBinding (`specific-configmap-reader-binding`) oluşturun.
+            3.  `config-consuming-app-pod` adlı bir Pod'un bu `config-reader-sa` ServiceAccount'ını kullanmasını sağlayın.
+        *   **Çözüm Yaklaşımı:** SA, Role, RoleBinding ve Pod manifestoları oluşturulur. CKAD sınavında hem imperative komutlar hem de YAML manifestleri kabul edilir.
             *   **ServiceAccount Oluşturma:** Genellikle `kubectl create serviceaccount <sa-name> -n <namespace>` yeterlidir.
-            *   **Role Oluşturma:** `resourceNames` gibi spesifik kısıtlamalar veya birden fazla kural içeren Role'ler için YAML manifesti kullanmak daha açık ve yönetilebilirdir.
+            *   **Role Oluşturma:**
+                *   **Imperative:** Basit Role'ler için (örn: tek bir kaynağa birkaç standart fiil ile erişim) `kubectl create role <role-name> --verb=<fiil1,fiil2> --resource=<kaynak-türü> -n <namespace>` kullanılabilir. Örneğin, tüm ConfigMap'leri okuma izni için: `kubectl create role configmap-reader --verb=get,list,watch --resource=configmaps -n <namespace>`.
+                *   **YAML Manifesti:** `resourceNames` (belirli bir kaynak örneğine erişim), birden fazla kural seti veya daha karmaşık API grubu/kaynak/fiil kombinasyonları gerektiğinde YAML manifesti kullanmak daha açık, yönetilebilir ve hataya daha az açıktır. Aşağıdaki "Efektif Çözüm"deki `specific-configmap-reader-role` örneği, `resourceNames` kullandığı için YAML ile daha iyi ifade edilir.
             *   **RoleBinding Oluşturma:** `kubectl create rolebinding <binding-name> --role=<role-name> --serviceaccount=<namespace>:<sa-name> -n <namespace>` gibi imperative komutlar çoğu senaryo için hızlı ve yeterlidir.
         *   **Efektif Çözüm:**
-            1.  `kubectl create serviceaccount config-reader-sa -n <namespace>`
-            2.  Role YAML (`specific-configmap-reader-role.yaml`):
+            1.  `kubectl create serviceaccount config-reader-sa -n <target-namespace>`
+            2.  Role YAML (`specific-configmap-reader-role.yaml`) - `resourceNames` gibi spesifik durumlar için YAML tercih edilir:
                 ```yaml
                 apiVersion: rbac.authorization.k8s.io/v1
                 kind: Role
@@ -937,6 +942,8 @@
                   verbs: ["get"]
                 ```
                 `kubectl apply -f specific-configmap-reader-role.yaml` (Eğer manifest içinde namespace belirtilmediyse `-n <target-namespace>` ile)
+                *Alternatif olarak, daha genel bir "tüm ConfigMap'leri okuma" rolü imperative olarak şöyle oluşturulabilirdi (ancak bu, use case'deki `resourceNames` gereksinimini karşılamaz):*
+                `# kubectl create role general-configmap-reader --verb=get,list --resource=configmaps -n <target-namespace>`
             3.  `kubectl create rolebinding specific-configmap-reader-binding --role=specific-configmap-reader-role --serviceaccount=<target-namespace>:config-reader-sa -n <target-namespace>`
             4.  `config-consuming-app-pod.yaml`:
                 ```yaml
