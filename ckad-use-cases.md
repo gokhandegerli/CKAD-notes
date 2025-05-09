@@ -1,3 +1,9 @@
+### Genel Sinav Stratejileri
+*   Namespace/Context: Her zaman doğru namespace'de olduğunuzdan emin olun.
+*   Imperative Komutlar: kubectl create/run/expose/set/scale/label/annotate/rollout gibi komutları önceliklendirin.
+*   YAML (--dry-run=client -o yaml ve kubectl get ... -o yaml): Imperative komutların yetmediği yerde hızlıca YAML oluşturup düzenleyin.
+*   kubectl explain: YAML alanları için vazgeçilmez yardımcınız. kubeclt <command> -h de etkilidir. 
+
 ### Configuration (Yapılandırma)
 
 *   **ConfigMaps**
