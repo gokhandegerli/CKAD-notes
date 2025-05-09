@@ -659,16 +659,17 @@
         ```
         `kubectl apply -f externalname-svc.yaml -n <namespace>`
 *   **Ingress Resource ve Ingress Controller**
-    *   **Use Case (TLS Sonlandırma ve Host Bazlı Yönlendirme):** `app.example.com` adresine gelen HTTPS trafiğini `app-service`'e (port 80), `api.example.com` adresine gelen HTTPS trafiğini ise `api-service`'e (port 8080) yönlendiren bir Ingress (`secure-ingress`) oluşturun. TLS sonlandırması için `example-tls-secret` adlı Secret'ı kullanın.
-    *   **Çözüm Yaklaşımı:** Ingress manifestosunda `tls` bölümü ve birden fazla `rules.host` tanımlanır. (Ingress controller ve TLS secret'ın önceden var olduğu varsayılır).
-    *   **Efektif Çözüm:** `secure-ingress.yaml`:
+    *   **Çalışma Mantığı Notu (Host Bazlı Yönlendirme):** Ingress, HTTP/HTTPS isteklerindeki `Host` başlığına bakarak trafiği farklı backend servislere yönlendirebilir. Bu, aynı IP adresi (Ingress Controller'ın dış IP'si) üzerinden birden fazla web sitesi veya servisi barındırmanıza olanak tanır. Her `host` için DNS kayıtlarınızın Ingress Controller'ın IP adresine yönlendirilmiş olması gerekir.
+    *   **Use Case 1 (TLS Sonlandırma ve Spesifik Host Bazlı Yönlendirme):** `app.example.com` adresine gelen HTTPS trafiğini `app-service`'e (port 80), `api.example.com` adresine gelen HTTPS trafiğini ise `api-service`'e (port 8080) yönlendiren bir Ingress (`secure-ingress`) oluşturun. TLS sonlandırması için `example-tls-secret` adlı Secret'ı kullanın.
+    *   **Efektif Çözüm (`secure-ingress.yaml`):**
         ```yaml
         apiVersion: networking.k8s.io/v1
         kind: Ingress
         metadata:
           name: secure-ingress
-          # annotations:
-          #   nginx.ingress.kubernetes.io/ssl-redirect: "true" # HTTP'yi HTTPS'e yönlendirme (controller'a bağlı)
+          annotations:
+            nginx.ingress.kubernetes.io/rewrite-target: / # Path'in kök dizine yeniden yazılacağını açıkça belirtir
+            nginx.ingress.kubernetes.io/ssl-redirect: "true" # HTTP'yi HTTPS'e yönlendirme (controller'a bağlı)
         spec:
           tls:
           - hosts:
@@ -680,7 +681,7 @@
             http:
               paths:
               - path: /
-                pathType: Prefix
+                pathType: Prefix # Prefix ile eşleşen tüm yollar
                 backend:
                   service:
                     name: app-service
@@ -690,7 +691,7 @@
             http:
               paths:
               - path: /
-                pathType: Prefix
+                pathType: Prefix # Prefix ile eşleşen tüm yollar
                 backend:
                   service:
                     name: api-service
@@ -698,6 +699,37 @@
                       number: 8080
         ```
         `kubectl apply -f secure-ingress.yaml -n <namespace>`
+    *   **Not (rewrite-target hakkında):** `nginx.ingress.kubernetes.io/rewrite-target: /` anotasyonu, NGINX Ingress Controller kullanıldığında, Ingress `path` tanımının backend servise iletilmeden önce nasıl işleneceğini belirtir. Eğer `path: /` ve `pathType: Prefix` kullanılıyorsa ve backend servis de istekleri kök yolda (`/`) bekliyorsa, bu anotasyon her zaman zorunlu olmayabilir. Ancak, path'in yeniden yazılmayacağını veya kök dizine yeniden yazılacağını açıkça belirtmek ve Ingress Controller versiyonları arasındaki olası davranış farklılıklarından kaçınmak için eklenmesi iyi bir pratiktir. Özellikle `path` değeri `/` dışında bir prefix (örn: `/my-app`) olduğunda ve servisin bu prefix olmadan isteği alması gerektiğinde kritik hale gelir (örn: `path: /my-app(/|$)(.*)` ve `rewrite-target: /$2`).
+    *   **Use Case 2 (Ingress Default Backend):** `store.example.com` adresine gelen trafiği `store-service`'e yönlendirin. Eğer Ingress Controller'a gelen istek `store.example.com` dışındaki bir host ile (veya host başlığı olmadan doğrudan IP üzerinden) gelirse, bu istekleri `default-catchall-service` adlı genel bir servise yönlendirin.
+    *   **Çözüm Yaklaşımı:** Ingress manifestosunda `spec.rules` altına host bazlı kural ve `spec.defaultBackend` alanı tanımlanır.
+    *   **Efektif Çözüm (`default-backend-ingress.yaml`):**
+        ```yaml
+        apiVersion: networking.k8s.io/v1
+        kind: Ingress
+        metadata:
+          name: default-backend-ingress
+          # annotations: (gerekirse controller'a özel anotasyonlar)
+        spec:
+          rules:
+          - host: store.example.com
+            http:
+              paths:
+              - path: /
+                pathType: Prefix
+                backend:
+                  service:
+                    name: store-service
+                    port:
+                      number: 80
+          defaultBackend: # Hiçbir kural eşleşmezse bu backend kullanılır
+            service:
+              name: default-catchall-service
+              port:
+                number: 8080
+        ```
+        `kubectl apply -f default-backend-ingress.yaml -n <namespace>`
+        *   **Not:** `defaultBackend` özelliği, tanımlı `rules` içindeki hiçbir host/path kombinasyonunun gelen istekle eşleşmemesi durumunda trafiğin nereye yönlendirileceğini belirler. Bu, beklenmeyen veya yanlış yapılandırılmış istekler için bir "yakala ve işle" (catch-all) mekanizması sağlar.
+           
 *   **Network Policies (Ağ Politikaları)**
     *   **Çalışma Mantığı Notu:**
         *   Bir namespace'de herhangi bir NetworkPolicy yoksa veya bir Pod herhangi bir NetworkPolicy tarafından seçilmiyorsa (`podSelector`'ı o Pod ile eşleşmiyorsa), o Pod için tüm gelen (ingress) ve giden (egress) trafik serbesttir.
