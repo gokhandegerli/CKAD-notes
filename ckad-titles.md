@@ -40,9 +40,12 @@
 *   **StorageClass, PV, PVC ve Pod'a Ekleme Entegrasyonu**
 
 ### Security (Güvenlik)
-*   **RBAC: ServiceAccounts, Roles, RoleBindings**
+*   **Authentication: Kubeconfig basics
 *   **İmaj güvenliği (Image security)**
-*   **API Grupları ve Kaynaklara Erişim**
+*   **RBAC: ServiceAccounts, Roles, RoleBindings, ClusterRoles, ClusterRoleBindings**
+*   **Admission Controllers
+*   **API Grupları ve Kaynaklara Erişim, API Versions/Deprecations**
+*   **Custom Resource Definitions (CRDs)
 *   **Minimum Yetki Prensibi (Principle of Least Privilege)**
 *   **Secrets yönetimi**
 
@@ -78,3 +81,8 @@
     *   `values.yaml` dosyası
     *   `--set` ve `--set-string` ile komut satırından değer geçme
     *   `--values` (`-f`) ile ek değer dosyaları kullanma
+ 
+   ### Ek Basliklar
+*   **Kubeconfig (Basics)**
+*   **Admission COntrollers**
+*   **LimitRanges**
