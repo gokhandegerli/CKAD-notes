@@ -30,7 +30,7 @@
 ### Services and Networking (Servisler ve Ağ İletişimi)
 *   **Service Tipleri**
 *   **Ingress Resource ve Ingress Controller**
-*   **Network Policies (Ağ Politikaları)**
+*   **Network Policies (Ağ Politikaları) (Ingress/Egress Rules)**
 
 ### State Persistence (Durum Kalıcılığı)
 *   **Volumes (Birimler)**
