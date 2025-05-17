@@ -43,7 +43,15 @@
 *   **Authentication: Kubeconfig basics**
 *   **İmaj güvenliği (Image security)**
 *   **RBAC: ServiceAccounts, Roles, RoleBindings, ClusterRoles, ClusterRoleBindings**
+*   * API level authorization; what user is allowed access to what kind of API operations.
 *   **Admission Controllers**
+*   *   RBAC ile yapilamayan bazi authorization kontrolleri icin kullanilir, Su asagidaki durumlarda kullaniriz:
+       *   Mesela Pod olusturulurken pod.yaml incelenip image name'a bakarak private olmayan repolardan izin vermek istemezsek,
+       *   Ya da *latest* tag'i kullanilmasina izin vermek istemezsek,
+       *   Ya da root user'in container'da tanimlanmasini engellemek istersek,
+       *   Ya da metadata'da *labels*'i zorunlu tutmak istersek,
+       *   Tum bunlarin otesinde cluster level ayarlamalar da yapabilir, request'i degistirebilir, pod'lar kurulmadan once ek islemler yapabilir.
+       *   'cat /etc/kubernetes/manifests/kube-apiserver.yaml | grep -i enable-admission-plugins' yaparak default olanlara ek olarak eklenmis admission controllerlari gorebiliriz. Ayrica default olanlari da 'kubectl exec -it kube-apiserver-controlplane -n kube-system -- kube-apiserver -h | grep -i enable-admission-plugins' yaparak icinden gorebiliriz.
 *   **API Grupları ve Kaynaklara Erişim, API Versions/Deprecations**
 *   **Custom Resource Definitions (CRDs)**
 *   **Minimum Yetki Prensibi (Principle of Least Privilege)**
