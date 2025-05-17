@@ -82,7 +82,4 @@
     *   `--set` ve `--set-string` ile komut satırından değer geçme
     *   `--values` (`-f`) ile ek değer dosyaları kullanma
  
-   ### Ek Basliklar
-*   **Kubeconfig (Basics)**
-*   **Admission COntrollers**
-*   **LimitRanges**
+
