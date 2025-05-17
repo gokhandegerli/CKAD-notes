@@ -40,12 +40,12 @@
 *   **StorageClass, PV, PVC ve Pod'a Ekleme Entegrasyonu**
 
 ### Security (Güvenlik)
-*   **Authentication: Kubeconfig basics
+*   **Authentication: Kubeconfig basics**
 *   **İmaj güvenliği (Image security)**
 *   **RBAC: ServiceAccounts, Roles, RoleBindings, ClusterRoles, ClusterRoleBindings**
-*   **Admission Controllers
+*   **Admission Controllers**
 *   **API Grupları ve Kaynaklara Erişim, API Versions/Deprecations**
-*   **Custom Resource Definitions (CRDs)
+*   **Custom Resource Definitions (CRDs)**
 *   **Minimum Yetki Prensibi (Principle of Least Privilege)**
 *   **Secrets yönetimi**
 
